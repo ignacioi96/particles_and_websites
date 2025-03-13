@@ -23,7 +23,9 @@ class Particle {
         this.waveStrength = 0;
         this.waveDecay = 0.95;
         this.wavePropagation = 0.1;
-        this.neighbors = []; // Store nearby particles
+        this.neighbors = [];
+        this.passedToNeighbors = false;
+        this.dirty = false;
     }
 
     update() {
@@ -39,12 +41,14 @@ class Particle {
             this.moving = false;
         }
 
+        // TODO: fix wave propagation and ripple effect
         if (this.waveStrength > 0) {
-            this.radius = this.radius * (1 + this.waveStrength * 0.1);
+            this.scale = this.scale * (1 + this.waveStrength * 0.1);
             this.waveStrength *= this.waveDecay;
             this.neighbors.forEach(p => {
                 p.waveStrength += this.waveStrength * this.wavePropagation;
             });
+            this.color = this.scale;
         }
 
         if (this.moving) {
@@ -53,19 +57,36 @@ class Particle {
             this.color = this.baseColor;
         }
 
+        if (mouseClicked) {
+            waves.forEach(wave => {
+                if (wave.particles.length < 5) {
+                    let wdx = wave.x - this.x;
+                    let wdy = wave.y - this.y;
+                    let wdd = Math.sqrt(wdx * wdx + wdy * wdy);
+                    if (wdd < 20) {
+                        wave.particles.push(this);
+                    }
+                }
+            });
+        }
+
         if (mouseInside && !mouseDoubleClicked) {
-            // Apply mouse interaction only when mouse is inside the canvas
             dx = this.x - cursor.x;
             dy = this.y - cursor.y;
             dd = Math.sqrt(dx * dx + dy * dy);
             let distDelta = this.minDist - dd;
             if (dd < this.minDist) {
-              this.ax += (dx / dd) * distDelta * this.pushFactor;
-              this.ay += (dy / dd) * distDelta * this.pushFactor;
-              this.moving = true;  // Start moving and change color
-              this.influenced = true; // Mark as influenced by the mouse
+                this.ax += (dx / dd) * distDelta * this.pushFactor;
+                this.ay += (dy / dd) * distDelta * this.pushFactor;
+                this.moving = true;
+                this.influenced = true;
             }
-          }
+        }
+
+        // Mark particle as dirty if position or scale changed
+        if (this.x !== this.ix || this.y !== this.iy || this.scale !== 20) {
+            this.dirty = true;
+        }
 
         this.vx += this.ax;
         this.vy += this.ay;
@@ -92,13 +113,4 @@ class Particle {
         context.fill();
         context.restore();
     }
-}
-
-function findNeighbors(particles, maxDistance = 50) {
-    particles.forEach(p => {
-        p.neighbors = particles.filter(other => {
-            let d = Math.sqrt((other.x - p.x) ** 2 + (other.y - p.y) ** 2);
-            return d > 0 && d < maxDistance;
-        });
-    });
 }
