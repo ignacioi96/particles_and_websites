@@ -83,7 +83,7 @@ class Particle {
             this.color = this.baseColor;
         }
 
-        if (mouseInside && !mouseDoubleClicked) {
+        if (mouseInside && mouseCreatesInfluence) {
             dx = this.x - cursor.x;
             dy = this.y - cursor.y;
             dd = Math.sqrt(dx * dx + dy * dy);

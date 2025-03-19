@@ -8,7 +8,7 @@ let waves = [];
 const cursor = { x: 9999, y: 9999 };
 let mouseInside = false;
 let mouseClicked = false;
-let mouseDoubleClicked = false;
+let mouseCreatesInfluence = true;
 let lastClickTime = 0;
 const clickThreshold = 300;
 let clickTimeout = null;
@@ -170,7 +170,7 @@ let touchMoved = false; // Flag to track touch move
 // Handle double click behavior (trigger ripples)
 const handleDoubleClick = (x, y) => {
     console.log("Double click at", x, y);
-    mouseDoubleClicked = !mouseDoubleClicked;
+    mouseCreatesInfluence = !mouseCreatesInfluence;
 };
 
 // Handle pointer down event
@@ -213,11 +213,15 @@ const moveHandler = (x, y) => {
     }
 };
 
+const nearClickButton = (event) => {
+    return ((event.clientX - (btnX + btnWidth / 2) ) ** 2 + (event.clientY - (btnY + btnHeight / 2) ) ** 2 < 100 ** 2);
+}
+
 // Handle pointer events
 canvas.addEventListener('pointermove', (e) => {
     moveHandler(e.clientX, e.clientY);
 
-    if (mouseDoubleClicked || ((e.clientX - (btnX + btnWidth / 2) ) ** 2 + (e.clientY - (btnY + btnHeight / 2) ) ** 2 > 100 ** 2)) {
+    if (!mouseCreatesInfluence || !nearClickButton(e)) {
         btnsTextColor = 'black';
     } else {
         btnsTextColor = 'white';
@@ -228,11 +232,16 @@ canvas.addEventListener('pointerup', (e) => {
     canvas.releasePointerCapture(e.pointerId);
 
     if (e.pointerType === 'touch') {
-        setTimeout(() => {
-            mouseInside = false;
-            btnsTextColor = 'black';
+        if (!nearClickButton(e)) {
 
-        }, 100);  // Slight delay to prevent premature deactivation
+            setTimeout(() => {
+
+                mouseInside = false;
+                btnsTextColor = 'black';
+                
+
+            }, 100);  // Slight delay to prevent premature deactivation
+        }
     }
 });
 
