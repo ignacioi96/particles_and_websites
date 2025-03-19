@@ -5,7 +5,9 @@ class Particle {
         this.ix = x;
         this.iy = y;
         this.radius = radius;
+        this.iradius = radius;
         this.scale = 20;
+        this.iscale = 20;
         this.baseColor = baseColor || fallbackColor;
         this.colMap = colMap || (() => fallbackColor);
         this.color = this.baseColor;
@@ -20,12 +22,16 @@ class Particle {
         this.moving = false;
         this.influenced = false;
         this.exploding = false;
-        this.waveStrength = 0;
-        this.waveDecay = 0.95;
-        this.wavePropagation = 0.1;
+        this.neighbourDistance = 20;
+        this.rippling = 0;
+        this.rippleTime = 7;
+        this.rippleDecay = 0.5;
         this.neighbors = [];
         this.passedToNeighbors = false;
-        this.dirty = false;
+    }
+
+    isAtEdge() {
+        return this.neighbors.length < 4; // If fewer than 3 neighbors, it's likely near an edge
     }
 
     update() {
@@ -37,37 +43,44 @@ class Particle {
         this.scale = mapRange(dd, 0, 200, 1, 5);
 
         const minAcceleration = 0.002;
-        if (Math.abs(this.ax) < minAcceleration && Math.abs(this.ay) < minAcceleration) {
+        if (Math.abs(this.vx) < minAcceleration && Math.abs(this.vy) < minAcceleration) {
             this.moving = false;
         }
 
-        // TODO: fix wave propagation and ripple effect
-        if (this.waveStrength > 0) {
-            this.scale = this.scale * (1 + this.waveStrength * 0.1);
-            this.waveStrength *= this.waveDecay;
-            this.neighbors.forEach(p => {
-                p.waveStrength += this.waveStrength * this.wavePropagation;
-            });
-            this.color = this.scale;
+        if (this.rippling) {
+            if (!this.passedToNeighbors) {
+                this.neighbors.forEach(p => {
+                    let delayFactor = Math.sqrt((this.x - p.x) ** 2 + (this.y - p.y) ** 2) / 50;
+
+                    setTimeout(() => {
+                        if (!p.rippling && !this.isAtEdge()) {  // Stop ripple if at edge
+                            p.rippling = true;
+                            p.rippleTime = this.rippleTime + this.rippleDecay / 2;
+                            p.passedToNeighbors = false;
+                        }
+                    }, delayFactor * 50);
+                });
+                this.passedToNeighbors = true;
+            }
+
+            this.radius += 2 * (Math.sin(this.rippleTime / Math.PI));
+            this.rippleTime += this.rippleDecay;
+
+            if (this.rippleTime > 7) {
+                this.rippleTime = 7;
+                this.rippling = false;
+                this.passedToNeighbors = false;
+                this.radius = this.iradius;
+                this.color = 200;
+            }
         }
 
         if (this.moving) {
             this.color = this.colMap(mapRange(dd, 0, 200, 0, 1));
+        } else if (this.radius !== this.iradius ) {
+            this.color = this.colMap(mapRange(this.rippleTime, 0, 7, 0, 1));  
         } else {
             this.color = this.baseColor;
-        }
-
-        if (mouseClicked) {
-            waves.forEach(wave => {
-                if (wave.particles.length < 5) {
-                    let wdx = wave.x - this.x;
-                    let wdy = wave.y - this.y;
-                    let wdd = Math.sqrt(wdx * wdx + wdy * wdy);
-                    if (wdd < 20) {
-                        wave.particles.push(this);
-                    }
-                }
-            });
         }
 
         if (mouseInside && !mouseDoubleClicked) {
@@ -83,9 +96,15 @@ class Particle {
             }
         }
 
-        // Mark particle as dirty if position or scale changed
-        if (this.x !== this.ix || this.y !== this.iy || this.scale !== 20) {
-            this.dirty = true;
+        if (mouseClicked && !this.rippling) { 
+            let dx = this.x - cursor.x;
+            let dy = this.y - cursor.y;
+            let ddSquared = dx * dx + dy * dy;
+            if (ddSquared < this.neighbourDistance * this.neighbourDistance) { 
+                this.rippling = true;
+                this.rippleTime = 0; // Reset to avoid timing issues
+                this.moving = true;
+            }
         }
 
         this.vx += this.ax;
